@@ -95,6 +95,7 @@ async def get_questions(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for i in range(0, len(content), 4000):
         await update.message.reply_text(content[i:i+4000])
 
+# ----------------------------
 def main():
     TOKEN = os.getenv("TELEGRAM_TOKEN")  # <-- берём токен из переменной окружения
     if not TOKEN:
@@ -103,6 +104,7 @@ def main():
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("getquestions", get_questions))  # <-- новая команда
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     print("🤖 Бот запущен... (режим сбора вопросов)")
