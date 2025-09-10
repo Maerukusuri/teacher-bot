@@ -97,18 +97,29 @@ async def get_questions(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ----------------------------
 def main():
-    TOKEN = os.getenv("TELEGRAM_TOKEN")  # <-- берём токен из переменной окружения
+    TOKEN = os.environ.get("TELEGRAM_TOKEN")
+    WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
+    PORT = int(os.environ.get("PORT", 8443))  # Railway предоставляет порт через переменную
+
     if not TOKEN:
         raise ValueError("❌ TELEGRAM_TOKEN не найден. Установите переменную окружения!")
+    if not WEBHOOK_URL:
+        raise ValueError("❌ WEBHOOK_URL не найден. Установите переменную окружения!")
 
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("getquestions", get_questions))  # <-- новая команда
+    app.add_handler(CommandHandler("getquestions", get_questions))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    print("🤖 Бот запущен... (режим сбора вопросов)")
-    app.run_polling()
+    print("🤖 Бот запущен... (режим сбора вопросов через webhook)")
+
+    # ----------------- Webhook -----------------
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=PORT,
+        webhook_url=WEBHOOK_URL
+    )
 
 # ----------------------------
 if __name__ == "__main__":
