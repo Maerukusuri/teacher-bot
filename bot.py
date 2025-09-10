@@ -82,6 +82,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(reply)
 
 # ----------------------------
+# Команда для получения всех вопросов
+async def get_questions(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not os.path.exists(QUESTIONS_FILE):
+        await update.message.reply_text("❌ Файл с вопросами не найден.")
+        return
+
+    with open(QUESTIONS_FILE, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # Если текст длинный, делим на части по 4000 символов (Telegram ограничение)
+    for i in range(0, len(content), 4000):
+        await update.message.reply_text(content[i:i+4000])
+
 def main():
     TOKEN = os.getenv("TELEGRAM_TOKEN")  # <-- берём токен из переменной окружения
     if not TOKEN:
