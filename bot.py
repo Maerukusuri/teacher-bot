@@ -3,7 +3,6 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 import re
 from datetime import datetime
 import os
-import git  # для пуша в GitHub
 
 # ----------------------------
 # Файл для сохранения вопросов
@@ -13,12 +12,6 @@ QUESTIONS_FILE = "questions.txt"
 if not os.path.exists(QUESTIONS_FILE):
     with open(QUESTIONS_FILE, "w", encoding="utf-8") as f:
         f.write("=== Вопросы учителей ===\n\n")
-
-# ----------------------------
-# Путь к репозиторию на сервере (Railway обычно /app)
-REPO_PATH = "/app"
-# Ссылка на GitHub с токеном из переменной окружения
-GITHUB_URL = f"https://{os.getenv('GITHUB_TOKEN')}@github.com/<USERNAME>/<REPO>.git"
 
 # ----------------------------
 # Определяем язык (RU или ET)
@@ -70,22 +63,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"UserID {update.message.from_user.id} ({update.message.from_user.first_name}): {text}\n"
             )
 
-        # --------- Пушим в GitHub ---------
-        try:
-            repo = git.Repo(REPO_PATH)
-            repo.git.add(QUESTIONS_FILE)
-            repo.index.commit(f"New question at {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-            origin = repo.remote(name='origin')
-            origin.push()
-            print("✅ Questions.txt pushed to GitHub")
-        except Exception as e:
-            print(f"❌ Ошибка при пуше в GitHub: {e}")
-        # ----------------------------------
-
         if lang == "ru":
-            reply = "✅ Вопрос сохранён и отправлен в GitHub!"
+            reply = "✅ Вопрос сохранён!"
         else:
-            reply = "✅ Küsimus salvestatud ja saadetud GitHub'i!"
+            reply = "✅ Küsimus on salvestatud!"
     else:
         if lang == "ru":
             reply = (
