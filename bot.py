@@ -22,10 +22,7 @@ def detect_language(text: str) -> str:
 
 # ----------------------------
 # Приветственное сообщение
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text or ""
-    lang = detect_language(text)
-
+async def send_welcome(update: Update, lang: str):
     if lang == "ru":
         welcome_text = (
             "👋 Привет! Я бот для учителей Тондираба.\n\n"
@@ -48,36 +45,30 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ----------------------------
 # Обработка сообщений
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
+    text = (update.message.text or "").strip()
     lang = detect_language(text)
 
     # Если это приветствие — показываем welcome
     if text.lower() in ["привет", "здравствуйте", "добрый день", "tere", "tsau", "hei"]:
-        return await start(update, context)
+        return await send_welcome(update, lang)
 
+    # Если сообщение — это вопрос
     if text.endswith("?"):
-        # Сохраняем вопрос с датой/временем и ID пользователя
         with open(QUESTIONS_FILE, "a", encoding="utf-8") as f:
             f.write(
                 f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] "
                 f"UserID {update.message.from_user.id} ({update.message.from_user.first_name}): {text}\n"
             )
 
-        if lang == "ru":
-            reply = "✅ Вопрос сохранён!"
-        else:
-            reply = "✅ Küsimus on salvestatud!"
+        reply = "✅ Вопрос сохранён!" if lang == "ru" else "✅ Küsimus on salvestatud!"
     else:
-        if lang == "ru":
-            reply = (
-                "⛔ Сейчас в мои функции входит сбор вопросов от учителей.\n"
-                "Пожалуйста, сформулируйте сообщение в виде вопроса и завершите его знаком вопроса (?)."
-            )
-        else:
-            reply = (
-                "⛔ Praegu on minu ülesanne koguda õpetajatelt küsimusi.\n"
-                "Palun sõnastage oma sõnum küsimusena ja lõpetage see küsimärgiga (?)."
-            )
+        reply = (
+            "⛔ Сейчас в мои функции входит сбор вопросов от учителей.\n"
+            "Пожалуйста, сформулируйте сообщение в виде вопроса и завершите его знаком вопроса (?)."
+            if lang == "ru"
+            else "⛔ Praegu on minu ülesanne koguda õpetajatelt küsimusi.\n"
+                 "Palun sõnastage oma sõnum küsimusena ja lõpetage see küsimärgiga (?)."
+        )
 
     await update.message.reply_text(reply)
 
@@ -91,26 +82,23 @@ async def get_questions(update: Update, context: ContextTypes.DEFAULT_TYPE):
     with open(QUESTIONS_FILE, "r", encoding="utf-8") as f:
         content = f.read()
 
-    # Если текст длинный, делим на части по 4000 символов (Telegram ограничение)
     for i in range(0, len(content), 4000):
         await update.message.reply_text(content[i:i+4000])
 
 # ----------------------------
 def main():
     TOKEN = os.environ.get("TELEGRAM_TOKEN")
-
     if not TOKEN:
         raise ValueError("❌ TELEGRAM_TOKEN не найден. Установите переменную окружения!")
 
     app = Application.builder().token(TOKEN).build()
 
-    app.add_handler(CommandHandler("start", start))
+    # Команда /start оставлена, но не обязательна
+    app.add_handler(CommandHandler("start", lambda u, c: send_welcome(u, detect_language(u.message.text or ""))))
     app.add_handler(CommandHandler("getquestions", get_questions))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     print("🤖 Бот запущен... (polling)")
-
-    # ----------------- Polling -----------------
     app.run_polling()
 
 # ----------------------------
