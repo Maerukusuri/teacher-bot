@@ -45,15 +45,23 @@ async def send_welcome(update: Update, lang: str):
 # ----------------------------
 # Обработка сообщений
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = (update.message.text or "").strip()
+    text = update.message.text.strip()
     lang = detect_language(text)
 
     # Если это приветствие — показываем welcome
     if text.lower() in ["привет", "здравствуйте", "добрый день", "tere", "tsau", "hei"]:
-        return await send_welcome(update, lang)
+        return await start(update, context)
 
-    # Если сообщение — это вопрос
+    # ✅ На вопрос "доколе?" бот отвечает картинкой
+    if text.lower() == "доколе?":
+        await update.message.reply_photo(
+            photo="https://i.pinimg.com/736x/43/e5/b1/43e5b1b417419ca8a9ea0194cd5a62e2.jpg",
+            caption="😅"
+        )
+        return
+
     if text.endswith("?"):
+        # Сохраняем вопрос
         with open(QUESTIONS_FILE, "a", encoding="utf-8") as f:
             f.write(
                 f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] "
@@ -66,8 +74,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "⛔ Сейчас в мои функции входит сбор вопросов от учителей.\n"
             "Пожалуйста, сформулируйте сообщение в виде вопроса и завершите его знаком вопроса (?)."
             if lang == "ru"
-            else "⛔ Praegu on minu ülesanne koguda õpetajatelt küsimusi.\n"
-                 "Palun sõnastage oma sõnum küsimusena ja lõpetage see küsimärgiga (?)."
+            else
+            "⛔ Praegu on minu ülesanne koguda õpetajatelt küsimusi.\n"
+            "Palun sõnastage oma sõnum küsimusena ja lõpetage see küsimärgiga (?)."
         )
 
     await update.message.reply_text(reply)
