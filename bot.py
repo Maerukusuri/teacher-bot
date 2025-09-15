@@ -21,14 +21,14 @@ if not os.path.exists(QUESTIONS_FILE):
     with open(QUESTIONS_FILE, "w", encoding="utf-8") as f:
         f.write("=== Вопросы учителей ===\n\n")
 
-# ----------------------------
+# --------------------------
 # Определяем язык (RU или ET)
 def detect_language(text: str) -> str:
     if re.search(r"[а-яА-ЯёЁ]", text):
         return "ru"
     return "et"
 
-# ----------------------------
+# --------------------------
 # Приветственное сообщение
 async def send_welcome(update: Update, lang: str):
     if lang == "ru":
