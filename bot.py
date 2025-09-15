@@ -24,10 +24,14 @@ def connect_gsheets():
         if not service_account_json:
             raise ValueError("❌ SERVICE_ACCOUNT_JSON не найдена. Установите переменную окружения!")
 
+        # Заменяем экранированные переносы на реальные
+        service_account_json = service_account_json.replace("\\n", "\n")
         service_account_info = json.loads(service_account_json)
         creds = Credentials.from_service_account_info(service_account_info)
         client = gspread.authorize(creds)
-        sheet = client.open("questions").sheet1  # или явно укажи worksheet("Лист1")
+
+        # Открываем таблицу по названию "questions"
+        sheet = client.open("questions").sheet1
         return sheet
     except Exception:
         logging.exception("Ошибка подключения к Google Sheets")
