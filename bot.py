@@ -19,11 +19,19 @@ logging.basicConfig(
 # ----------------------------
 # Подключение к Google Sheets
 def connect_gsheets():
-    service_account_info = json.loads(os.getenv("SERVICE_ACCOUNT_JSON"))
-    creds = Credentials.from_service_account_info(service_account_info)
-    client = gspread.authorize(creds)
-    # Открываем таблицу по названию
-    return client.open("questions").sheet1
+    try:
+        service_account_json = os.getenv("SERVICE_ACCOUNT_JSON")
+        if not service_account_json:
+            raise ValueError("❌ SERVICE_ACCOUNT_JSON не найдена. Установите переменную окружения!")
+
+        service_account_info = json.loads(service_account_json)
+        creds = Credentials.from_service_account_info(service_account_info)
+        client = gspread.authorize(creds)
+        sheet = client.open("questions").sheet1  # или явно укажи worksheet("Лист1")
+        return sheet
+    except Exception:
+        logging.exception("Ошибка подключения к Google Sheets")
+        raise
 
 # --------------------------
 # Определяем язык (RU или ET)
@@ -76,15 +84,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text.endswith("?"):
         try:
             sheet = connect_gsheets()
+            first_name = update.message.from_user.first_name or "Без имени"
             sheet.append_row([
                 datetime.now().strftime("%Y-%m-%d %H:%M"),
                 str(update.message.from_user.id),
-                update.message.from_user.first_name,
+                first_name,
                 text
             ])
             reply = "✅ Вопрос сохранён!" if lang == "ru" else "✅ Küsimus on salvestatud!"
-        except Exception as e:
-            logging.error(f"Ошибка при записи в Google Sheets: {e}")
+        except Exception:
+            logging.exception("Ошибка при записи в Google Sheets")
             reply = "❌ Ошибка при сохранении вопроса." if lang == "ru" else "❌ Küsimuse salvestamisel tekkis viga."
     else:
         reply = (
@@ -117,8 +126,8 @@ async def get_questions(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for i in range(0, len(text), 4000):
             await update.message.reply_text(text[i:i+4000])
 
-    except Exception as e:
-        logging.error(f"Ошибка при получении вопросов: {e}")
+    except Exception:
+        logging.exception("Ошибка при получении вопросов")
         await update.message.reply_text("❌ Ошибка при чтении вопросов из Google Sheets.")
 
 # ----------------------------
