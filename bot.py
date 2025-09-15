@@ -3,12 +3,20 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 import re
 from datetime import datetime
 import os
+import logging
+from telegram.error import NetworkError, TelegramError
+
+# ----------------------------
+# Настройка логирования
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO
+)
 
 # ----------------------------
 # Файл для сохранения вопросов
 QUESTIONS_FILE = "questions.txt"
 
-# Проверяем, есть ли файл, если нет — создаём
 if not os.path.exists(QUESTIONS_FILE):
     with open(QUESTIONS_FILE, "w", encoding="utf-8") as f:
         f.write("=== Вопросы учителей ===\n\n")
@@ -48,11 +56,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     lang = detect_language(text)
 
-    # Если это приветствие — показываем welcome
+    # Приветствие
     if text.lower() in ["привет", "здравствуйте", "добрый день", "tere", "tsau", "hei"]:
-        return await start(update, context)
+        return await send_welcome(update, lang)
 
-    # ✅ На вопрос "доколе?" бот отвечает картинкой
+    # На вопрос "доколе?" бот отвечает картинкой
     if text.lower() == "доколе?":
         await update.message.reply_photo(
             photo="https://i.pinimg.com/736x/43/e5/b1/43e5b1b417419ca8a9ea0194cd5a62e2.jpg",
@@ -60,8 +68,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    # Сохраняем вопросы
     if text.endswith("?"):
-        # Сохраняем вопрос
         with open(QUESTIONS_FILE, "a", encoding="utf-8") as f:
             f.write(
                 f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] "
@@ -95,6 +103,17 @@ async def get_questions(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(content[i:i+4000])
 
 # ----------------------------
+# Обработчик ошибок
+async def handle_error(update, context):
+    logging.error(f"Update {update} вызвал ошибку: {context.error}")
+    if isinstance(context.error, NetworkError):
+        logging.warning("⚠️ NetworkError: возможно временный сбой, повторная попытка...")
+    elif isinstance(context.error, TelegramError):
+        logging.warning("⚠️ TelegramError: проверьте токен или доступ к API")
+    else:
+        logging.warning(f"⚠️ Другая ошибка: {context.error}")
+
+# ----------------------------
 def main():
     TOKEN = os.environ.get("TELEGRAM_TOKEN")
     if not TOKEN:
@@ -102,10 +121,12 @@ def main():
 
     app = Application.builder().token(TOKEN).build()
 
-    # Команда /start оставлена, но не обязательна
     app.add_handler(CommandHandler("start", lambda u, c: send_welcome(u, detect_language(u.message.text or ""))))
     app.add_handler(CommandHandler("getquestions", get_questions))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    # Обработчик ошибок
+    app.add_error_handler(handle_error)
 
     print("🤖 Бот запущен... (polling)")
     app.run_polling()
