@@ -4,6 +4,9 @@ import re
 from datetime import datetime
 import os
 import logging
+import json
+import gspread
+from google.oauth2.service_account import Credentials
 from telegram.error import NetworkError, TelegramError
 
 # ----------------------------
@@ -14,12 +17,13 @@ logging.basicConfig(
 )
 
 # ----------------------------
-# Файл для сохранения вопросов
-QUESTIONS_FILE = "questions.txt"
-
-if not os.path.exists(QUESTIONS_FILE):
-    with open(QUESTIONS_FILE, "w", encoding="utf-8") as f:
-        f.write("=== Вопросы учителей ===\n\n")
+# Подключение к Google Sheets
+def connect_gsheets():
+    service_account_info = json.loads(os.getenv("SERVICE_ACCOUNT_JSON"))
+    creds = Credentials.from_service_account_info(service_account_info)
+    client = gspread.authorize(creds)
+    # Открываем таблицу по названию
+    return client.open("questions").sheet1
 
 # --------------------------
 # Определяем язык (RU или ET)
@@ -68,15 +72,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Сохраняем вопросы
+    # Сохраняем вопросы в Google Sheets
     if text.endswith("?"):
-        with open(QUESTIONS_FILE, "a", encoding="utf-8") as f:
-            f.write(
-                f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] "
-                f"UserID {update.message.from_user.id} ({update.message.from_user.first_name}): {text}\n"
-            )
-
-        reply = "✅ Вопрос сохранён!" if lang == "ru" else "✅ Küsimus on salvestatud!"
+        try:
+            sheet = connect_gsheets()
+            sheet.append_row([
+                datetime.now().strftime("%Y-%m-%d %H:%M"),
+                str(update.message.from_user.id),
+                update.message.from_user.first_name,
+                text
+            ])
+            reply = "✅ Вопрос сохранён!" if lang == "ru" else "✅ Küsimus on salvestatud!"
+        except Exception as e:
+            logging.error(f"Ошибка при записи в Google Sheets: {e}")
+            reply = "❌ Ошибка при сохранении вопроса." if lang == "ru" else "❌ Küsimuse salvestamisel tekkis viga."
     else:
         reply = (
             "⛔ Сейчас в мои функции входит сбор вопросов от учителей.\n"
@@ -92,15 +101,25 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ----------------------------
 # Команда для получения всех вопросов
 async def get_questions(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not os.path.exists(QUESTIONS_FILE):
-        await update.message.reply_text("❌ Файл с вопросами не найден.")
-        return
+    try:
+        sheet = connect_gsheets()
+        rows = sheet.get_all_values()
 
-    with open(QUESTIONS_FILE, "r", encoding="utf-8") as f:
-        content = f.read()
+        if len(rows) <= 1:
+            await update.message.reply_text("❌ Вопросов пока нет.")
+            return
 
-    for i in range(0, len(content), 4000):
-        await update.message.reply_text(content[i:i+4000])
+        text = "=== Вопросы ===\n\n"
+        for row in rows[1:]:  # пропускаем заголовки
+            text += f"[{row[0]}] {row[2]} ({row[1]}): {row[3]}\n"
+
+        # Telegram ограничивает 4096 символов, режем на куски
+        for i in range(0, len(text), 4000):
+            await update.message.reply_text(text[i:i+4000])
+
+    except Exception as e:
+        logging.error(f"Ошибка при получении вопросов: {e}")
+        await update.message.reply_text("❌ Ошибка при чтении вопросов из Google Sheets.")
 
 # ----------------------------
 # Обработчик ошибок
